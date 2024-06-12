@@ -2,18 +2,41 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/claycot/mlb-gameday-api/handlers"
+	"github.com/joho/godotenv"
+	"github.com/rs/cors"
 )
 
 func main() {
 	// specify the type of logging to use
 	l := log.New(os.Stdout, "mlb-gameday-api", log.LstdFlags)
+
+	// load env (Hostname, Port, API url, CORS whitelist)
+	err := godotenv.Load()
+	if err != nil {
+		l.Fatal("Error loading .env file")
+	}
+
+	// fetch and convert port from .env
+	port, err := strconv.Atoi(os.Getenv("PORT_"))
+	if err != nil {
+		l.Fatal("Invalid PORT specified in environment")
+	}
+
+	// configure cors to use .env whitelist
+	c := cors.New(cors.Options{
+		AllowedOrigins: strings.Split(os.Getenv("ALLOWED_ORIGINS"), ","),
+		AllowedMethods: []string{"GET"},
+	})
 
 	// create a new handler with the specified logger
 	gh := handlers.NewGames(l)
@@ -21,10 +44,15 @@ func main() {
 	// set up routes with handler
 	router := initializeRoutesGames(gh)
 
+	// protect routes with CORS
+	l.Println("Applying CORS configuration")
+	handler := c.Handler(router)
+
 	// create and configure a server
+	addr := fmt.Sprintf("%s:%d", os.Getenv("HOSTNAME_"), port)
 	s := &http.Server{
-		Addr:         "localhost:3001",
-		Handler:      router,
+		Addr:         addr,
+		Handler:      handler,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,
@@ -36,6 +64,7 @@ func main() {
 		if err != nil {
 			l.Fatal(err)
 		}
+		l.Printf("Running server on %s", addr)
 	}()
 
 	// create a channel to hold OS signals (interrupt, shutdown)

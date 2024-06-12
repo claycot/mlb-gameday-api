@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -88,9 +89,17 @@ func (g *Games) ToJSON() ([]byte, error) {
 	return js, err
 }
 
-func GetGames() (*Games, error) {
+// get formatted information on live games with a given date string MM/DD/YYYY (or "" to get today)
+func GetGames(dateString string) (*Games, error) {
+	// set the date for the game fetch
+	if dateString == "" {
+		dateString = time.Now().Format("01/02/2006")
+	}
+	apiUrl := fmt.Sprintf("%s/api/v1/schedule/?sportId=1&date=%s", os.Getenv("MLB_API_URL"), dateString)
+	fmt.Println(apiUrl)
+
 	// get the list of today's games from MLB
-	resp, err := http.Get("https://statsapi.mlb.com/api/v1/schedule/?sportId=1&date=06/12/2024")
+	resp, err := http.Get(apiUrl)
 	if err != nil {
 		return nil, err
 	}
@@ -100,6 +109,8 @@ func GetGames() (*Games, error) {
 	err = schedule.FromJSON(resp.Body)
 	if err != nil {
 		return nil, err
+	} else if len(schedule.Dates) == 0 {
+		return nil, fmt.Errorf("schedule endpoint returned no games for provided date: %s", dateString)
 	}
 
 	// make a map of the players in all live games, starting with a null value
@@ -119,7 +130,7 @@ func GetGames() (*Games, error) {
 
 	// process requested games from Dates[0]
 	var wg sync.WaitGroup
-	for g := 0; g < len(schedule.Dates[0].Games); g++ {
+	for gameNum := 0; gameNum < len(schedule.Dates[0].Games); gameNum++ {
 		// each game will require a request to a different API endpoint for live game info (pitchers, score, etc.)
 		wg.Add(1)
 		go func(gameIndex int) {
@@ -127,12 +138,12 @@ func GetGames() (*Games, error) {
 			defer wg.Done()
 
 			// get information on the live game, from the link provided in the schedule response
-			fmt.Printf("dispatching request for game %d at link %s\n", gameIndex, schedule.Dates[0].Games[gameIndex].Link)
-			resp, err := http.Get("https://statsapi.mlb.com/" + schedule.Dates[0].Games[gameIndex].Link)
+			// fmt.Printf("dispatching request for game %d at link %s\n", gameIndex, schedule.Dates[0].Games[gameIndex].Link)
+			resp, err := http.Get(os.Getenv("MLB_API_URL") + schedule.Dates[0].Games[gameIndex].Link)
 			if err != nil {
 				fmt.Printf("error: %e", err)
 			}
-			fmt.Printf("got game info for game %d; status %s\n", gameIndex, resp.Status)
+			// fmt.Printf("got game info for game %d; status %s\n", gameIndex, resp.Status)
 
 			// marshal the live game data into a struct
 			lg := api_data.LiveGame{}
@@ -220,18 +231,19 @@ func GetGames() (*Games, error) {
 			}
 
 			// write information to the return object
-			fmt.Printf("writing game data for %d\n", gameIndex)
+			// fmt.Printf("writing game data for %d\n", gameIndex)
 			// fmt.Printf("data: %v", lg)
 			games.Data[gameIndex] = &Game{
 				ID:    schedule.Dates[0].Games[gameIndex].GamePk,
 				State: *s,
 				Teams: *t,
 			}
-		}(g)
+		}(gameNum)
 	}
+
 	// wait until all game data has been retrieved
 	wg.Wait()
-	fmt.Println("returning")
+	// fmt.Println("returning")
 	// fmt.Printf("games: %v", games)
 	return games, nil
 }
