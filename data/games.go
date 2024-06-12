@@ -113,17 +113,9 @@ func GetGames(dateString string) (*Games, error) {
 		return nil, fmt.Errorf("schedule endpoint returned no games for provided date: %s", dateString)
 	}
 
-	// make a map of the players in all live games, starting with a null value
-	players := make(map[uint32]*Player)
-	players[0] = &Player{
-		ID:     0,
-		Name:   "TBD",
-		Number: "-1",
-	}
-
 	games := &Games{
 		Metadata: Metadata{
-			Timestamp: time.Now().String(),
+			Timestamp: time.Now().Format(time.RFC3339Nano),
 		},
 		Data: make([]*Game, len(schedule.Dates[0].Games)),
 	}
@@ -150,6 +142,14 @@ func GetGames(dateString string) (*Games, error) {
 			err = lg.FromJSON(resp.Body)
 			if err != nil {
 				fmt.Printf("error: %e", err)
+			}
+
+			// make a map of the players in the game, starting with a null value
+			players := make(map[uint32]*Player)
+			players[0] = &Player{
+				ID:     0,
+				Name:   "TBD",
+				Number: "-1",
 			}
 
 			// add each player in the game into the players map
@@ -228,6 +228,24 @@ func GetGames(dateString string) (*Games, error) {
 					Detailed:  lg.GameData.Status.DetailedState,
 					StartTime: lg.GameData.Datetime,
 				},
+			}
+
+			// catch API quirks in batter display
+			// 1. they're batting and also on base
+			// 2. if there are 3 outs, the team is still at bat but the other team's batter is up
+			if s.Outs == 3 ||
+				s.Diamond.Batter == s.Diamond.First ||
+				s.Diamond.Batter == s.Diamond.Second ||
+				s.Diamond.Batter == s.Diamond.Third {
+				s.Diamond.Batter = *players[0]
+			}
+
+			// update information for finalized games
+			if s.Status.General == "Final" {
+				// clear the batter
+				s.Diamond.Batter = *players[0]
+				// zero the outs
+				s.Outs = 0
 			}
 
 			// write information to the return object
