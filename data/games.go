@@ -93,7 +93,12 @@ func (g *Games) ToJSON() ([]byte, error) {
 func GetGames(dateString string) (*Games, error) {
 	// set the date for the game fetch
 	if dateString == "" {
-		dateString = time.Now().Format("01/02/2006")
+		// force LA time since server might change day early
+		pacificTime, err := time.LoadLocation("America/Los_Angeles")
+		if err != nil {
+			fmt.Println("err: ", err.Error())
+		}
+		dateString = time.Now().In(pacificTime).Format("01/02/2006")
 	}
 	apiUrl := fmt.Sprintf("%s/api/v1/schedule/?sportId=1&date=%s", os.Getenv("MLB_API_URL"), dateString)
 	fmt.Println(apiUrl)
