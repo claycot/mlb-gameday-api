@@ -89,6 +89,45 @@ func (g *Games) ToJSON() ([]byte, error) {
 	return js, err
 }
 
+// create a store for game information, so if 100000 users are online (standard load)
+// we only get 1 set of requests to the MLB API
+var (
+	gamesStore = struct {
+		sync.RWMutex
+		data Games // this isn't a pointer to games because games would be created as a temp object, and we need this to persist!
+	}{}
+)
+
+// wrap GetGames in a cache mechanism that invalidates data older than 30 seconds!
+func GetCachedGames(dateString string) (*Games, error) {
+	// read the cached games object, which includes a metadata timestamp and games
+	gamesStore.RLock()
+	gamesObj := gamesStore.data
+	gamesStore.RUnlock()
+
+	// attempt to parse timestamp from the gamesObj metadata
+	ts, err := time.Parse(time.RFC3339Nano, gamesObj.Metadata.Timestamp)
+
+	// if we couldn't parse the timestamp, or if it's older than 30 seconds, refresh data!
+	if err != nil || time.Since(ts) > 30*time.Second {
+		gamesStore.Lock()
+
+		// force a refresh
+		gPtr, err := GetGames(dateString)
+		if err != nil {
+			return nil, err
+		}
+
+		// write the data to the cache
+		gamesStore.data = *gPtr
+
+		gamesStore.Unlock()
+	}
+
+	// return the information on the games inside of the gamesStore
+	return &gamesStore.data, nil
+}
+
 // get formatted information on live games with a given date string MM/DD/YYYY (or "" to get today)
 func GetGames(dateString string) (*Games, error) {
 	// set the date for the game fetch
@@ -100,6 +139,7 @@ func GetGames(dateString string) (*Games, error) {
 		}
 		dateString = time.Now().In(pacificTime).Format("01/02/2006")
 	}
+
 	apiUrl := fmt.Sprintf("%s/api/v1/schedule/?sportId=1&date=%s", os.Getenv("MLB_API_URL"), dateString)
 	fmt.Println(apiUrl)
 

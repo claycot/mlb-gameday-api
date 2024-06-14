@@ -19,7 +19,7 @@ func NewGames(l *log.Logger) *Games {
 func (g *Games) GetGames(rw http.ResponseWriter, r *http.Request) {
 	g.l.Println("Handle GET games")
 
-	gameList, err := data.GetGames("")
+	gameList, err := data.GetCachedGames("")
 	if err != nil {
 		http.Error(rw, fmt.Sprintf("Unable to fetch games: %s", err), http.StatusBadGateway)
 		return
