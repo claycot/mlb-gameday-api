@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
@@ -306,7 +307,41 @@ func GetGames(dateString string) (*Games, error) {
 
 	// wait until all game data has been retrieved
 	wg.Wait()
+
+	// sort the list of games
+	sortGames(games.Data)
+
 	// fmt.Println("returning")
 	// fmt.Printf("games: %v", games)
 	return games, nil
+}
+
+// sort games in-place
+func sortGames(games []*Game) {
+	statusOrder := map[string]int{
+		"Live":    0,
+		"Final":   1,
+		"Preview": 2,
+	}
+
+	sort.Slice(games, func(i, j int) bool {
+		g1, g2 := games[i], games[j]
+
+		statusComp := statusOrder[g1.State.Status.General] - statusOrder[g2.State.Status.General]
+		if statusComp != 0 {
+			return statusComp < 0
+		}
+
+		// disabled because it causes games to jump around as they outpace others
+		// // if both games are live, sort by inning number (higher first)
+		// if g1.State.Status.General == "Live" {
+		// 	return g2.State.Inning.Number < g1.State.Inning.Number
+		// }
+
+		// otherwise, sort by start time (earliest first)
+		g1Start := g1.State.Status.StartTime.DateTime
+		g2Start := g2.State.Status.StartTime.DateTime
+
+		return g1Start.Before(g2Start)
+	})
 }
