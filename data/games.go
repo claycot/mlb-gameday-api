@@ -277,9 +277,11 @@ func GetGames(dateString string) (*Games, error) {
 			}
 
 			// catch API quirks in batter display
-			// 1. they're batting and also on base
+			// 1. if the game hasn't started
 			// 2. if there are 3 outs, the team is still at bat but the other team's batter is up
-			if s.Outs == 3 ||
+			// 3. they're batting and also on base
+			if s.Status.General != "Live" ||
+				s.Outs == 3 ||
 				s.Diamond.Batter == s.Diamond.First ||
 				s.Diamond.Batter == s.Diamond.Second ||
 				s.Diamond.Batter == s.Diamond.Third {
