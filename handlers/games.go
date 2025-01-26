@@ -16,10 +16,10 @@ func NewGames(l *log.Logger) *Games {
 	return &Games{l}
 }
 
-func (g *Games) GetGames(rw http.ResponseWriter, r *http.Request) {
-	g.l.Println("Handle GET games")
+func (g *Games) GetInitial(rw http.ResponseWriter, r *http.Request, store *data.GameCache) {
+	g.l.Println("Handle GET initial")
 
-	gameList, err := data.GetCachedGames("")
+	gameList, err := data.GetInitialGames(store)
 	if err != nil {
 		http.Error(rw, fmt.Sprintf("Unable to fetch games: %s", err), http.StatusBadGateway)
 		return
@@ -34,4 +34,31 @@ func (g *Games) GetGames(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(http.StatusOK)
 	rw.Write(games)
+}
+
+func (g *Games) GetUpdates(rw http.ResponseWriter, r *http.Request, updates chan string) {
+	g.l.Println("Handle GET updates")
+
+	rw.Header().Set("Content-Type", "text/event-stream")
+	rw.Header().Set("Cache-Control", "no-cache")
+	rw.Header().Set("Connection", "keep-alive")
+
+	flusher, ok := rw.(http.Flusher)
+	if !ok {
+		http.Error(rw, "Streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	g.l.Println("Starting event stream")
+	for {
+		select {
+		case msg := <-updates:
+			g.l.Printf("Sending update: %s", msg)
+			fmt.Fprintf(rw, "data: %s\n\n", msg)
+			flusher.Flush()
+		case <-r.Context().Done():
+			g.l.Printf("Connection closed! Reason: %v", r.Context().Err())
+			return
+		}
+	}
 }
