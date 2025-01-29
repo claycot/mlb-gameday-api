@@ -12,6 +12,11 @@ type Games struct {
 	l *log.Logger
 }
 
+type Update struct {
+	Event string
+	Data  string
+}
+
 func NewGames(l *log.Logger) *Games {
 	return &Games{l}
 }
@@ -36,7 +41,7 @@ func (g *Games) GetInitial(rw http.ResponseWriter, r *http.Request, store *data.
 	rw.Write(games)
 }
 
-func (g *Games) GetUpdates(rw http.ResponseWriter, r *http.Request, updates chan string) {
+func (g *Games) GetUpdates(rw http.ResponseWriter, r *http.Request, updates chan Update) {
 	g.l.Println("Handle GET updates")
 
 	rw.Header().Set("Content-Type", "text/event-stream")
@@ -52,9 +57,10 @@ func (g *Games) GetUpdates(rw http.ResponseWriter, r *http.Request, updates chan
 	g.l.Println("Starting event stream")
 	for {
 		select {
-		case msg := <-updates:
-			g.l.Printf("Sending update: %s", msg)
-			fmt.Fprintf(rw, "data: %s\n\n", msg)
+		case update := <-updates:
+			g.l.Printf("Sending update: %s", update)
+			// fmt.Fprintf(rw, "data: %s\n\n", update.Data)
+			fmt.Fprintf(rw, "event: %s\ndata: %s\n\n", update.Event, update.Data)
 			flusher.Flush()
 		case <-r.Context().Done():
 			g.l.Printf("Connection closed! Reason: %v", r.Context().Err())
