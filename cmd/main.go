@@ -25,9 +25,6 @@ func main() {
 	// Create context with cancel
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// WaitGroup to manage goroutines
-	var wg sync.WaitGroup
-
 	// Capture termination signals
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, os.Kill)
@@ -36,6 +33,9 @@ func main() {
 		logger.Println("Received terminate signal")
 		cancel()
 	}()
+
+	// WaitGroup to manage goroutine daemons
+	var wg sync.WaitGroup
 
 	// Initialize and start the server
 	srv, err := server.New(ctx, &wg, cfg, logger)

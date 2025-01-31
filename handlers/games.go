@@ -59,7 +59,6 @@ func (g *Games) GetUpdates(rw http.ResponseWriter, r *http.Request, updates chan
 		select {
 		case update := <-updates:
 			g.l.Printf("Sending update: %s", update)
-			// fmt.Fprintf(rw, "data: %s\n\n", update.Data)
 			fmt.Fprintf(rw, "event: %s\ndata: %s\n\n", update.Event, update.Data)
 			flusher.Flush()
 		case <-r.Context().Done():

@@ -19,6 +19,7 @@ func Initialize(ctx context.Context, wg *sync.WaitGroup, logger *log.Logger) *ht
 	updates := make(chan handlers.Update)
 
 	// Start background workers
+	wg.Add(2)
 	go workers.AuditGames(ctx, gamesStore, updates, logger, wg)
 	go workers.FindNewGames(ctx, gamesStore, updates, logger, wg)
 

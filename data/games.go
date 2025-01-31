@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -19,7 +20,8 @@ type Games struct {
 }
 
 type GameCache struct {
-	cache sync.Map
+	cache  sync.Map
+	length uint8
 }
 
 type Game struct {
@@ -27,14 +29,15 @@ type Game struct {
 	Link     string   `json:"link"`
 	ID       uint32   `json:"id"`
 	State    State    `json:"state"`
-	Teams    Teams    `json:"teams"`
 }
 
 type Metadata struct {
 	Timestamp time.Time `json:"timestamp"`
+	Ready     bool      `json:"ready"`
 }
 
 type State struct {
+	Teams   Teams   `json:"teams"`
 	Inning  Inning  `json:"inning"`
 	Diamond Diamond `json:"diamond"`
 	Outs    uint8   `json:"outs"`
@@ -97,45 +100,141 @@ func (g *Games) ToJSON() ([]byte, error) {
 	return js, err
 }
 
-// Set updates or adds a game to the cache
-func (gc *GameCache) Set(id uint32, g Game) {
-	gc.cache.Store(id, g)
-}
-
-// Get retrieves a game from the cache
-func (gc *GameCache) Get(id uint32) (Game, bool) {
-	if value, ok := gc.cache.Load(id); ok {
-		return value.(Game), true
+// Discover adds a partial game to the cache
+func (gc *GameCache) Discover(id uint32, link string) (bool, error) {
+	// check if the game already exists before discovering
+	_, exists := gc.cache.Load(id)
+	if exists {
+		return false, nil
 	}
-	return Game{}, false
+
+	// TODO: Magic number uint8 max
+	if gc.length >= 255 {
+		return false, fmt.Errorf("games cache is full with %d games", gc.length)
+	}
+
+	// if the game doesn't exist, discover it
+	gc.cache.Store(id, Game{
+		Metadata: Metadata{
+			Timestamp: time.Now(),
+			Ready:     false,
+		},
+		Link: link,
+		ID:   id,
+	})
+	gc.length++
+
+	return true, nil
 }
 
-// Delete removes a game from the cache
-func (gc *GameCache) Delete(id uint32) {
-	gc.cache.Delete(id)
+// GetLink returns the link for a game
+func (gc *GameCache) GetLink(id uint32) (string, error) {
+	// check if the game exists
+	game, exists := gc.cache.Load(id)
+	if !exists {
+		return "", fmt.Errorf("game with id %d does not exist, even as a partial", id)
+	}
+
+	// if the game exists, return the link
+	return game.(Game).Link, nil
 }
 
-// Fetch updates the cache with new game data
-func (gc *GameCache) Fetch(link string, wg *sync.WaitGroup) (bool, error) {
-	// get updated information on the game
-	newGame, err := FetchGame(link, wg)
+// Fetch uses the stored game link to update cache game info
+func (gc *GameCache) Fetch(ctx context.Context, id uint32) (bool, error) {
+	// get the link from the game cache
+	link, err := gc.GetLink(id)
+	if err != nil {
+		return false, err
+	}
 
-	// if failed to fetch, return err
+	// get updated information on the game, passing context to handle cancellation
+	newGame, err := FetchGame(ctx, link)
 	if err != nil {
 		return false, err
 	}
 
 	// if successful, check if the game has changed
-	oldGame, exists := gc.Get(newGame.ID)
-	if !exists || !reflect.DeepEqual(oldGame, newGame) {
-		gc.Set(newGame.ID, newGame)
-		return true, nil
+	oldGameRaw, exists := gc.cache.Load(id)
+	if exists {
+		oldGame := oldGameRaw.(Game)
+		// if the game did not change, return false
+		if reflect.DeepEqual(oldGame, newGame) {
+			return false, nil
+		}
 	}
-	return false, nil
+
+	// otherwise, store the game and return true
+	gc.cache.Store(id, newGame)
+	return true, nil
+}
+
+// GetOne retrieves a game from the cache by ID
+func (gc *GameCache) GetOne(ctx context.Context, id uint32) (Game, bool) {
+	gameRaw, exists := gc.cache.Load(id)
+
+	// if the game doesn't exist, return empty and false
+	if !exists {
+		return Game{}, false
+	}
+
+	game := gameRaw.(Game)
+
+	// if the game exists, but isn't ready, load it
+	if !game.Metadata.Ready {
+		updated, err := gc.Fetch(ctx, id)
+
+		// if failed to fetch a new version, return empty and false
+		if !updated || err != nil {
+			return Game{}, false
+		}
+
+		// try to load again
+		if updatedGameRaw, ok := gc.cache.Load(id); ok {
+			return updatedGameRaw.(Game), true
+		}
+
+		// if the new load fails, return false
+		return Game{}, false
+	}
+
+	// if the game was already ready, return it
+	return game, true
+}
+
+// GetAll retrieves all ready games from the cache
+func (gc *GameCache) GetAll() ([]*Game, error) {
+	if gc.length > 0 {
+		games := make([]*Game, gc.length)
+
+		g := 0
+		gc.cache.Range(func(key, value interface{}) bool {
+			game := value.(Game)
+
+			if game.Metadata.Ready {
+				games[g] = &game
+				g++
+			}
+			return true
+		})
+		return games[0 : g-1], nil
+	} else {
+		return nil, nil
+	}
+}
+
+// Delete removes a game from the cache
+func (gc *GameCache) Delete(id uint32) {
+	_, exists := gc.cache.Load(id)
+
+	// must check if the game exists before decrementing the length
+	if exists {
+		gc.cache.Delete(id)
+		gc.length--
+	}
 }
 
 // Audit cache (refresh games and prune dead games)
-func (gc *GameCache) Audit(wg *sync.WaitGroup) ([]uint32, []uint32, []uint32) {
+func (gc *GameCache) Audit(ctx context.Context) ([]uint32, []uint32, []uint32) {
 	var updated, removed, failed []uint32
 	gc.cache.Range(func(key, value interface{}) bool {
 		game := value.(Game)
@@ -143,7 +242,7 @@ func (gc *GameCache) Audit(wg *sync.WaitGroup) ([]uint32, []uint32, []uint32) {
 
 		if game.State.Status.General == "Live" && time.Since(game.Metadata.Timestamp) > (30*time.Second) {
 			// refresh active games
-			dataChanged, err := gc.Fetch(game.Link, wg)
+			dataChanged, err := gc.Fetch(ctx, id)
 			if err != nil {
 				failed = append(failed, id)
 			} else if dataChanged {
@@ -159,58 +258,33 @@ func (gc *GameCache) Audit(wg *sync.WaitGroup) ([]uint32, []uint32, []uint32) {
 	return updated, removed, failed
 }
 
-// wrap GetGames in a cache mechanism that invalidates data older than 30 seconds!
+// when a user first visits, get all games
 func GetInitialGames(gamesStore *GameCache) (*Games, error) {
-	gameIds, gameLinks, err := ListGamesByDate("04/25/2024")
+	games, err := gamesStore.GetAll()
+
 	if err != nil {
 		return nil, err
 	}
 
-	// load all of today's games from the cache
-	games := make([]*Game, len(gameIds))
-	var wg sync.WaitGroup
-	for i := 0; i < len(gameIds); i++ {
-		game, valid := gamesStore.Get(gameIds[i])
-		if !valid {
-			fmt.Printf("fetching information on game %d at link %s\n", gameIds[i], gameLinks[i])
-			updated, err := gamesStore.Fetch(gameLinks[i], &wg)
-			if err == nil && updated {
-				game, valid = gamesStore.Get(gameIds[i])
-			}
-		}
-
-		if valid {
-			fmt.Printf("getting cached information on game %d\n", gameIds[i])
-			games[i] = &game
-		} else {
-			return nil, fmt.Errorf("failed to fetch information on game: %d", gameIds[i])
-		}
-	}
-
-	// wait until all game data has been retrieved
-	wg.Wait()
-
-	// sort the list of games
 	sortGames(games)
 
-	// fmt.Println("returning")
-	// fmt.Printf("games: %v", games)
 	return &Games{
 		Metadata: Metadata{
 			Timestamp: time.Now(),
+			Ready:     true,
 		},
 		Data: games,
 	}, nil
 }
 
 // get formatted information on live games with a given date string MM/DD/YYYY (or "" to get today)
-func ListGamesByDate(dateString string) ([]uint32, []string, error) {
+func ListGamesByDate(ctx context.Context, dateString string) ([]uint32, []string, error) {
 	// set the date for the game fetch
 	if dateString == "" {
 		// force LA time since server might change day early
 		pacificTime, err := time.LoadLocation("America/Los_Angeles")
 		if err != nil {
-			fmt.Println("err: ", err.Error())
+			return nil, nil, err
 		}
 		dateString = time.Now().In(pacificTime).Format("01/02/2006")
 	}
@@ -218,8 +292,16 @@ func ListGamesByDate(dateString string) ([]uint32, []string, error) {
 	apiUrl := fmt.Sprintf("%s/api/v1/schedule/?sportId=1&date=%s", os.Getenv("MLB_API_URL"), dateString)
 	fmt.Println(apiUrl)
 
+	fetchCtx, cancel := context.WithTimeout(ctx, 10*time.Second) // Set a 10-second timeout for each fetch
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(fetchCtx, http.MethodGet, apiUrl, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	// get the list of today's games from MLB
-	resp, err := http.Get(apiUrl)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -243,26 +325,29 @@ func ListGamesByDate(dateString string) ([]uint32, []string, error) {
 	return gameIds, gameLinks, nil
 }
 
-// get game object given an ID
-func FetchGame(link string, wg *sync.WaitGroup) (Game, error) {
-	// wait until the game is processed
-	wg.Add(1)
-	defer wg.Done()
-
+// get game object given a link
+func FetchGame(ctx context.Context, link string) (Game, error) {
 	// get information on the live game, from the link provided in the schedule response
 	// fmt.Printf("dispatching request for game %d at link %s\n", gameIndex, schedule.Dates[0].Games[gameIndex].Link)
-	resp, err := http.Get(link)
+	fetchCtx, cancel := context.WithTimeout(ctx, 10*time.Second) // Set a 10-second timeout for each fetch
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(fetchCtx, http.MethodGet, link, nil)
 	if err != nil {
-		fmt.Printf("error: %e", err)
 		return Game{}, err
 	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return Game{}, err
+	}
+	defer resp.Body.Close()
 	// fmt.Printf("got game info for game %d; status %s\n", gameIndex, resp.Status)
 
 	// marshal the live game data into a struct
 	lg := api_data.LiveGame{}
 	err = lg.FromJSON(resp.Body)
 	if err != nil {
-		fmt.Printf("error: %e", err)
 		return Game{}, err
 	}
 
@@ -327,13 +412,13 @@ func FetchGame(link string, wg *sync.WaitGroup) (Game, error) {
 		Pitcher: *players[pitcherAwayID],
 		Score:   lg.LiveData.Linescore.Teams.Away.Runs,
 	}
-	t := &Teams{
-		Away: *ta,
-		Home: *th,
-	}
 
 	// set information about the game state
 	s := &State{
+		Teams: Teams{
+			Away: *ta,
+			Home: *th,
+		},
 		Inning: Inning{
 			Number:     lg.LiveData.Linescore.CurrentInning,
 			Top_bottom: lg.LiveData.Linescore.InningHalf,
@@ -379,9 +464,9 @@ func FetchGame(link string, wg *sync.WaitGroup) (Game, error) {
 		ID:    uint32(lg.GamePk),
 		Link:  link,
 		State: *s,
-		Teams: *t,
 		Metadata: Metadata{
 			Timestamp: time.Now(),
+			Ready:     true,
 		},
 	}, nil
 }
