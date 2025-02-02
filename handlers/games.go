@@ -41,7 +41,7 @@ func (g *Games) GetInitial(rw http.ResponseWriter, r *http.Request, store *data.
 	rw.Write(games)
 }
 
-func (g *Games) GetUpdates(rw http.ResponseWriter, r *http.Request, updates chan Update, broadcaster *Broadcaster) {
+func (g *Games) GetUpdates(rw http.ResponseWriter, r *http.Request, broadcaster *Broadcaster) {
 	g.l.Println("Handle GET updates")
 
 	rw.Header().Set("Content-Type", "text/event-stream")
@@ -69,7 +69,7 @@ func (g *Games) GetUpdates(rw http.ResponseWriter, r *http.Request, updates chan
 	g.l.Println("Starting event stream")
 	for {
 		select {
-		case update := <-updates:
+		case update := <-userChannel:
 			g.l.Printf("Sending update: %s", update)
 			fmt.Fprintf(rw, "event: %s\ndata: %s\n\n", update.Event, update.Data)
 			flusher.Flush()

@@ -61,7 +61,7 @@ func Initialize(ctx context.Context, wg *sync.WaitGroup, logger *log.Logger) *ht
 		gh.GetInitial(rw, r, gamesStore)
 	})
 	mux.HandleFunc("/api/games/update", func(rw http.ResponseWriter, r *http.Request) {
-		gh.GetUpdates(rw, r, updates, broadcaster)
+		gh.GetUpdates(rw, r, broadcaster)
 	})
 
 	return mux
