@@ -17,6 +17,36 @@ func Initialize(ctx context.Context, wg *sync.WaitGroup, logger *log.Logger) *ht
 	// Initialize game store and updates channel
 	gamesStore := &data.GameCache{}
 	updates := make(chan handlers.Update)
+	broadcaster := handlers.NewBroadcaster()
+
+	// use a broadcaster to send updates to all connected clients
+	go func() {
+		for {
+			// Wait for messages
+			msg, ok := <-updates
+			if !ok {
+				return // Channel closed, exit goroutine
+			}
+
+			countSent, err := broadcaster.Broadcast(&msg)
+
+			if err != nil {
+				logger.Printf("failed to send update: %e\r\n", err)
+			}
+
+			logger.Printf("sent update to %d of %d connected clients", countSent, broadcaster.Count)
+		}
+	}()
+
+	// on context cancelation, wait for workers to finish and then close the channel
+	go func() {
+		<-ctx.Done()
+		logger.Println("Context canceled, waiting for workers to finish...")
+
+		wg.Wait()
+		logger.Println("All workers done, closing updates channel")
+		close(updates)
+	}()
 
 	// Start background workers
 	wg.Add(2)
@@ -31,7 +61,7 @@ func Initialize(ctx context.Context, wg *sync.WaitGroup, logger *log.Logger) *ht
 		gh.GetInitial(rw, r, gamesStore)
 	})
 	mux.HandleFunc("/api/games/update", func(rw http.ResponseWriter, r *http.Request) {
-		gh.GetUpdates(rw, r, updates)
+		gh.GetUpdates(rw, r, updates, broadcaster)
 	})
 
 	return mux

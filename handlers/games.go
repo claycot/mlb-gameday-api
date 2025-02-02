@@ -41,19 +41,31 @@ func (g *Games) GetInitial(rw http.ResponseWriter, r *http.Request, store *data.
 	rw.Write(games)
 }
 
-func (g *Games) GetUpdates(rw http.ResponseWriter, r *http.Request, updates chan Update) {
+func (g *Games) GetUpdates(rw http.ResponseWriter, r *http.Request, updates chan Update, broadcaster *Broadcaster) {
 	g.l.Println("Handle GET updates")
 
 	rw.Header().Set("Content-Type", "text/event-stream")
 	rw.Header().Set("Cache-Control", "no-cache")
 	rw.Header().Set("Connection", "keep-alive")
 
+	// make a channel to send SSE updates to the user
+	userChannel := make(chan *Update, 16)
+	chanId, err := broadcaster.Register(userChannel)
+
+	if err != nil {
+		http.Error(rw, fmt.Sprintf("Unable to create channel: %s", err), http.StatusInternalServerError)
+		return
+	}
+	defer broadcaster.Deregister(chanId)
+
+	// flush messages to the updates channel
 	flusher, ok := rw.(http.Flusher)
 	if !ok {
 		http.Error(rw, "Streaming unsupported", http.StatusInternalServerError)
 		return
 	}
 
+	// send updates to the channel
 	g.l.Println("Starting event stream")
 	for {
 		select {
