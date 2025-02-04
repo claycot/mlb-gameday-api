@@ -100,7 +100,7 @@ func (g *Games) ToJSON() ([]byte, error) {
 	return js, err
 }
 
-// Discover adds a partial game to the cache
+// add a partial game to the cache
 func (gc *GameCache) Discover(id uint32, link string) (bool, error) {
 	// check if the game already exists before discovering
 	_, exists := gc.cache.Load(id)
@@ -127,7 +127,7 @@ func (gc *GameCache) Discover(id uint32, link string) (bool, error) {
 	return true, nil
 }
 
-// GetLink returns the link for a game
+// return the link for a game, or an error if it doesn't exist
 func (gc *GameCache) GetLink(id uint32) (string, error) {
 	// check if the game exists
 	game, exists := gc.cache.Load(id)
@@ -139,7 +139,7 @@ func (gc *GameCache) GetLink(id uint32) (string, error) {
 	return game.(Game).Link, nil
 }
 
-// Fetch uses the stored game link to update cache game info
+// use the stored game link to update cache game info
 func (gc *GameCache) Fetch(ctx context.Context, id uint32) (bool, error) {
 	// get the link from the game cache
 	link, err := gc.GetLink(id)
@@ -168,7 +168,7 @@ func (gc *GameCache) Fetch(ctx context.Context, id uint32) (bool, error) {
 	return true, nil
 }
 
-// GetOne retrieves a game from the cache by ID
+// retrieve a game from the cache by ID
 func (gc *GameCache) GetOne(ctx context.Context, id uint32) (Game, bool) {
 	gameRaw, exists := gc.cache.Load(id)
 
@@ -201,7 +201,7 @@ func (gc *GameCache) GetOne(ctx context.Context, id uint32) (Game, bool) {
 	return game, true
 }
 
-// GetAll retrieves all ready games from the cache
+// retrieve all ready games from the cache
 func (gc *GameCache) GetAll() ([]*Game, error) {
 	if gc.length > 0 {
 		games := make([]*Game, gc.length)
@@ -222,7 +222,7 @@ func (gc *GameCache) GetAll() ([]*Game, error) {
 	}
 }
 
-// Delete removes a game from the cache
+// remove a game from the cache
 func (gc *GameCache) Delete(id uint32) {
 	_, exists := gc.cache.Load(id)
 
@@ -233,14 +233,15 @@ func (gc *GameCache) Delete(id uint32) {
 	}
 }
 
-// Audit cache (refresh games and prune dead games)
+// refresh games and prune dead games
 func (gc *GameCache) Audit(ctx context.Context) ([]uint32, []uint32, []uint32) {
 	var updated, removed, failed []uint32
 	gc.cache.Range(func(key, value interface{}) bool {
 		game := value.(Game)
 		id := key.(uint32)
 
-		if game.State.Status.General == "Live" && time.Since(game.Metadata.Timestamp) > (30*time.Second) {
+		if (game.State.Status.General == "Live" && time.Since(game.Metadata.Timestamp) > (30*time.Second)) ||
+			(game.State.Status.General == "Preview" && time.Since(game.Metadata.Timestamp) > (15*time.Minute)) {
 			// refresh active games
 			dataChanged, err := gc.Fetch(ctx, id)
 			if err != nil {
@@ -292,7 +293,8 @@ func ListGamesByDate(ctx context.Context, dateString string) ([]uint32, []string
 	apiUrl := fmt.Sprintf("%s/api/v1/schedule/?sportId=1&date=%s", os.Getenv("MLB_API_URL"), dateString)
 	fmt.Println(apiUrl)
 
-	fetchCtx, cancel := context.WithTimeout(ctx, 10*time.Second) // Set a 10-second timeout for each fetch
+	// limit each fetch to 10 seconds
+	fetchCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(fetchCtx, http.MethodGet, apiUrl, nil)
@@ -329,7 +331,9 @@ func ListGamesByDate(ctx context.Context, dateString string) ([]uint32, []string
 func FetchGame(ctx context.Context, link string) (Game, error) {
 	// get information on the live game, from the link provided in the schedule response
 	// fmt.Printf("dispatching request for game %d at link %s\n", gameIndex, schedule.Dates[0].Games[gameIndex].Link)
-	fetchCtx, cancel := context.WithTimeout(ctx, 10*time.Second) // Set a 10-second timeout for each fetch
+
+	// limit each fetch to 10 seconds
+	fetchCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(fetchCtx, http.MethodGet, link, nil)

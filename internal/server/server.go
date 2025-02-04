@@ -19,10 +19,10 @@ type Server struct {
 }
 
 func New(ctx context.Context, wg *sync.WaitGroup, cfg *config.Config, logger *log.Logger) (*Server, error) {
-	// Initialize routes, passing wg for worker daemons
+	// initialize routes, passing wg for worker daemons
 	router := Initialize(ctx, wg, logger)
 
-	// Configure CORS
+	// configure CORS usuing the config
 	corsMiddleware := cors.New(cors.Options{
 		AllowedOrigins: cfg.AllowedOrigins,
 		AllowedMethods: []string{"GET"},

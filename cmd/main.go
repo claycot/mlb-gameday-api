@@ -13,19 +13,19 @@ import (
 )
 
 func main() {
-	// Initialize logger
+	// initialize logger
 	logger := log.New(os.Stdout, "mlb-gameday-api", log.LstdFlags)
 
-	// Load configuration
+	// load config from .env file, or defaults if no file is provided
 	cfg, err := config.Load()
 	if err != nil {
 		logger.Fatal("Error loading configuration: ", err)
 	}
 
-	// Create context with cancel
+	// create context to be used throughout requests
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Capture termination signals
+	// capture termination signals for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, os.Kill)
 	go func() {
@@ -34,23 +34,23 @@ func main() {
 		cancel()
 	}()
 
-	// WaitGroup to manage goroutine daemons
+	// waitGroup to manage goroutine daemons
 	var wg sync.WaitGroup
 
-	// Initialize and start the server
+	// initialize and start the server
 	srv, err := server.New(ctx, &wg, cfg, logger)
 	if err != nil {
 		logger.Fatal("Failed to start server: ", err)
 	}
 
-	// Run the server in a separate goroutine
+	// run the server in a separate goroutine
 	go func() {
 		if err := srv.Run(ctx); err != nil && err != http.ErrServerClosed {
 			logger.Fatal("Server error: ", err)
 		}
 	}()
 
-	// Wait for all workers to complete
+	// wait for all workers to complete
 	wg.Wait()
 	logger.Println("All workers completed, exiting application.")
 }

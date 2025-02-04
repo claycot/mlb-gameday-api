@@ -11,6 +11,7 @@ import (
 	"github.com/claycot/mlb-gameday-api/handlers"
 )
 
+// run the audit games function on the games store and send updates as SSE events
 func AuditGames(ctx context.Context, gamesStore *data.GameCache, updates chan handlers.Update, logger *log.Logger, wg *sync.WaitGroup) {
 	defer wg.Done()
 

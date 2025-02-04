@@ -1,5 +1,9 @@
 package api_data
 
+// WHATIS: this file has structs for the game data that comes back from the MLB API!
+// there are 2 main endpoints used: schedule, which lists all games on a given date
+// and live game info, which gives information on a game with a given ID
+
 import (
 	"encoding/json"
 	"io"

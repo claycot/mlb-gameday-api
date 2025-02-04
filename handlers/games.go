@@ -21,6 +21,7 @@ func NewGames(l *log.Logger) *Games {
 	return &Games{l}
 }
 
+// handler for when a user first visits and the existing games should be ready on page load
 func (g *Games) GetInitial(rw http.ResponseWriter, r *http.Request, store *data.GameCache) {
 	g.l.Println("Handle GET initial")
 
@@ -41,6 +42,7 @@ func (g *Games) GetInitial(rw http.ResponseWriter, r *http.Request, store *data.
 	rw.Write(games)
 }
 
+// handler for SSE updates to the games on the site
 func (g *Games) GetUpdates(rw http.ResponseWriter, r *http.Request, broadcaster *Broadcaster) {
 	g.l.Println("Handle GET updates")
 

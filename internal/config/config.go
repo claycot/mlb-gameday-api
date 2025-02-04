@@ -14,6 +14,7 @@ type Config struct {
 	AllowedOrigins []string
 }
 
+// load the config, with defaults if the .env file doesn't exist or values are not provided
 func Load() (*Config, error) {
 	err := godotenv.Load()
 	if err != nil {

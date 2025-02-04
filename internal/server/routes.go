@@ -14,7 +14,7 @@ import (
 func Initialize(ctx context.Context, wg *sync.WaitGroup, logger *log.Logger) *http.ServeMux {
 	mux := http.NewServeMux()
 
-	// Initialize game store and updates channel
+	// initialize game store and updates channel
 	gamesStore := &data.GameCache{}
 	updates := make(chan handlers.Update)
 	broadcaster := handlers.NewBroadcaster()
@@ -22,14 +22,15 @@ func Initialize(ctx context.Context, wg *sync.WaitGroup, logger *log.Logger) *ht
 	// use a broadcaster to send updates to all connected clients
 	go func() {
 		for {
-			// Wait for messages
+			// wait for updates
 			msg, ok := <-updates
+			// if the channel is closed, exit
 			if !ok {
-				return // Channel closed, exit goroutine
+				return
 			}
 
+			// broadcast the message to all active clients
 			countSent, err := broadcaster.Broadcast(&msg)
-
 			if err != nil {
 				logger.Printf("failed to send update: %e\r\n", err)
 			}
@@ -48,15 +49,15 @@ func Initialize(ctx context.Context, wg *sync.WaitGroup, logger *log.Logger) *ht
 		close(updates)
 	}()
 
-	// Start background workers
+	// start background workers
 	wg.Add(2)
 	go workers.AuditGames(ctx, gamesStore, updates, logger, wg)
 	go workers.FindNewGames(ctx, gamesStore, updates, logger, wg)
 
-	// Initialize handlers
+	// initialize handlers
 	gh := handlers.NewGames(logger)
 
-	// Define routes
+	// define routes
 	mux.HandleFunc("/api/games/initial", func(rw http.ResponseWriter, r *http.Request) {
 		gh.GetInitial(rw, r, gamesStore)
 	})
