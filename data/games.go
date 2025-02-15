@@ -216,7 +216,7 @@ func (gc *GameCache) GetAll() ([]*Game, error) {
 			}
 			return true
 		})
-		return games[0 : g-1], nil
+		return games[0:g], nil
 	} else {
 		return nil, nil
 	}
