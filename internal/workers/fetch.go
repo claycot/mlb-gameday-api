@@ -16,7 +16,7 @@ func FindNewGames(ctx context.Context, gamesStore *data.GameCache, updates chan 
 	defer wg.Done()
 
 	// update games every 15 minutes
-	ticker := time.NewTicker(1 * time.Minute)
+	ticker := time.NewTicker(15 * time.Minute)
 	defer ticker.Stop()
 
 	for {
@@ -30,7 +30,7 @@ func FindNewGames(ctx context.Context, gamesStore *data.GameCache, updates chan 
 			logger.Println("FindNewGames: finding new games")
 			var added []uint32
 			// fetch a list of all games on today's date and their links
-			gameIds, gameLinks, err := data.ListGamesByDate(ctx, "04/20/2024")
+			gameIds, gameLinks, err := data.ListGamesByDate(ctx, "")
 			if err != nil {
 				logger.Println("Added 0 games")
 				continue
