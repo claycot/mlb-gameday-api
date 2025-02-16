@@ -5,4 +5,4 @@ swagger:
 	GO111MODULE=off swagger generate spec -o ./swagger.yaml --scan-models
 
 run:
-	go run main.go
+	go run cmd/main.go
