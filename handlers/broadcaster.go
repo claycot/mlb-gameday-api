@@ -20,11 +20,12 @@ func NewBroadcaster() *Broadcaster {
 // register a client's channel to the broadcaster and return their uuid
 func (b *Broadcaster) Register(channel chan *Update) (uuid.UUID, error) {
 	var id uuid.UUID
+	var err error
 	exists := true
 
 	// avoid uuid collisions even though they'll never happen
 	for exists {
-		id, err := uuid.NewRandom()
+		id, err = uuid.NewRandom()
 
 		if err != nil {
 			return uuid.Nil, fmt.Errorf("failed to generate UUID: %w", err)
@@ -36,7 +37,7 @@ func (b *Broadcaster) Register(channel chan *Update) (uuid.UUID, error) {
 	b.clients.Store(id, channel)
 	atomic.AddInt32(&b.Count, 1)
 
-	fmt.Printf("registered client with ID %v. now serving %d clients.", id, b.Count)
+	fmt.Printf("registered client with ID %v. now serving %d clients.\r\n", id, b.Count)
 
 	return id, nil
 }
@@ -59,7 +60,7 @@ func (b *Broadcaster) Deregister(clientId uuid.UUID) (bool, error) {
 	b.clients.Delete(clientId)
 	atomic.AddInt32(&b.Count, -1)
 
-	fmt.Printf("deregistered client with ID %v. now serving %d clients.", clientId, b.Count)
+	fmt.Printf("deregistered client with ID %v. now serving %d clients.\r\n", clientId, b.Count)
 
 	return true, nil
 }
