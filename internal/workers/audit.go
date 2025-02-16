@@ -2,7 +2,6 @@ package workers
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -15,8 +14,8 @@ import (
 func AuditGames(ctx context.Context, gamesStore *data.GameCache, updates chan handlers.Update, logger *log.Logger, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	// update games every 5 seconds
-	ticker := time.NewTicker(5 * time.Second)
+	// update games every 30 seconds
+	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -66,12 +65,42 @@ func AuditGames(ctx context.Context, gamesStore *data.GameCache, updates chan ha
 			// process removed games by outputting their IDs
 			if len(removed) > 0 {
 				logger.Printf("REMOVE:%v", removed)
-				updates <- handlers.Update{Event: "remove", Data: fmt.Sprintf("%v", removed)}
+				remove := &data.GameIDs{
+					Metadata: data.Metadata{
+						Timestamp: time.Now(),
+					},
+					Data: make([]*uint32, len(removed)),
+				}
+				for i := range removed {
+					remove.Data[i] = &removed[i]
+				}
+				// marshal to json and return
+				updateJson, err := remove.ToJSON()
+				if err != nil {
+					logger.Printf("failed to marshal updates to json: %e\r\n", err)
+				} else {
+					updates <- handlers.Update{Event: "remove", Data: string(updateJson)}
+				}
 			}
 			// process failed games by outputting their IDs
 			if len(failed) > 0 {
 				logger.Printf("FAILED:%v", failed)
-				updates <- handlers.Update{Event: "fail", Data: fmt.Sprintf("%v", failed)}
+				fail := &data.GameIDs{
+					Metadata: data.Metadata{
+						Timestamp: time.Now(),
+					},
+					Data: make([]*uint32, len(failed)),
+				}
+				for i := range failed {
+					fail.Data[i] = &failed[i]
+				}
+				// marshal to json and return
+				updateJson, err := fail.ToJSON()
+				if err != nil {
+					logger.Printf("failed to marshal updates to json: %e\r\n", err)
+				} else {
+					updates <- handlers.Update{Event: "fail", Data: string(updateJson)}
+				}
 			}
 		}
 	}

@@ -19,6 +19,11 @@ type Games struct {
 	Data     []*Game  `json:"data"`
 }
 
+type GameIDs struct {
+	Metadata Metadata  `json:"metadata"`
+	Data     []*uint32 `json:"data"`
+}
+
 type GameCache struct {
 	cache  sync.Map
 	length uint8
@@ -96,6 +101,11 @@ type Player struct {
 }
 
 func (g *Games) ToJSON() ([]byte, error) {
+	js, err := json.Marshal(g)
+	return js, err
+}
+
+func (g *GameIDs) ToJSON() ([]byte, error) {
 	js, err := json.Marshal(g)
 	return js, err
 }
@@ -240,8 +250,11 @@ func (gc *GameCache) Audit(ctx context.Context) ([]uint32, []uint32, []uint32) {
 		game := value.(Game)
 		id := key.(uint32)
 
-		if (game.State.Status.General == "Live" && time.Since(game.Metadata.Timestamp) > (30*time.Second)) ||
-			(game.State.Status.General == "Preview" && time.Since(game.Metadata.Timestamp) > (15*time.Minute)) {
+		// refresh live games
+		// also refresh preview and final games (less frequently)
+		if (game.State.Status.General == "Live" && time.Since(game.Metadata.Timestamp) > (5*time.Second)) ||
+			(game.State.Status.General == "Preview" && time.Since(game.Metadata.Timestamp) > (15*time.Minute)) ||
+			(game.State.Status.General == "Final" && time.Since(game.Metadata.Timestamp) > (30*time.Minute)) {
 			// refresh active games
 			dataChanged, err := gc.Fetch(ctx, id)
 			if err != nil {
@@ -249,8 +262,8 @@ func (gc *GameCache) Audit(ctx context.Context) ([]uint32, []uint32, []uint32) {
 			} else if dataChanged {
 				updated = append(updated, id)
 			}
-		} else if game.State.Status.General == "Final" && time.Since(game.Metadata.Timestamp) > (12*time.Hour) {
-			// prune games that have been over for 12 hours
+			// prune games that are final and started over 15 hours ago
+		} else if game.State.Status.General == "Final" && time.Since(game.State.Status.StartTime.DateTime) > (15*time.Hour) {
 			gc.Delete(id)
 			removed = append(removed, id)
 		}
