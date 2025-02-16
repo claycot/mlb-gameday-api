@@ -36,7 +36,7 @@ func (b *Broadcaster) Register(channel chan *Update) (uuid.UUID, error) {
 	b.clients.Store(id, channel)
 	atomic.AddInt32(&b.Count, 1)
 
-	fmt.Printf("registered client with ID %s\r\n. now serving %d clients.", id, b.Count)
+	fmt.Printf("registered client with ID %v. now serving %d clients.", id, b.Count)
 
 	return id, nil
 }
@@ -59,7 +59,7 @@ func (b *Broadcaster) Deregister(clientId uuid.UUID) (bool, error) {
 	b.clients.Delete(clientId)
 	atomic.AddInt32(&b.Count, -1)
 
-	fmt.Printf("deregistered client with ID %s\r\n. now serving %d clients.", clientId, b.Count)
+	fmt.Printf("deregistered client with ID %v. now serving %d clients.", clientId, b.Count)
 
 	return true, nil
 }
