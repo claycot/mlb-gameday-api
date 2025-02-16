@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -15,10 +16,10 @@ type Config struct {
 }
 
 // load the config, with defaults if the .env file doesn't exist or values are not provided
-func Load() (*Config, error) {
+func Load(logger *log.Logger) (*Config, error) {
 	err := godotenv.Load()
 	if err != nil {
-		return nil, err
+		logger.Printf("Failed to load .env file: %e\r\n", err)
 	}
 
 	port, err := strconv.Atoi(getEnv("PORT_", "8080"))
@@ -28,7 +29,7 @@ func Load() (*Config, error) {
 
 	return &Config{
 		Port:           port,
-		Hostname:       getEnv("HOSTNAME_", "localhost"),
+		Hostname:       getEnv("HOSTNAME_", ""),
 		AllowedOrigins: strings.Split(getEnv("ALLOWED_ORIGINS", "*"), ","),
 	}, nil
 }

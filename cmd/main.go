@@ -17,7 +17,7 @@ func main() {
 	logger := log.New(os.Stdout, "mlb-gameday-api", log.LstdFlags)
 
 	// load config from .env file, or defaults if no file is provided
-	cfg, err := config.Load()
+	cfg, err := config.Load(logger)
 	if err != nil {
 		logger.Fatal("Error loading configuration: ", err)
 	}
