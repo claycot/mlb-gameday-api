@@ -57,7 +57,7 @@ func AuditGames(ctx context.Context, gamesStore *data.GameCache, updates chan ha
 				// marshal to json and return
 				updateJson, err := update.ToJSON()
 				if err != nil {
-					logger.Printf("failed to marshal updates to json: %e\r\n", err)
+					logger.Printf("failed to marshal updates to json: %v\r\n", err)
 				} else {
 					updates <- handlers.Update{Event: "update", Data: string(updateJson)}
 				}
@@ -77,7 +77,7 @@ func AuditGames(ctx context.Context, gamesStore *data.GameCache, updates chan ha
 				// marshal to json and return
 				updateJson, err := remove.ToJSON()
 				if err != nil {
-					logger.Printf("failed to marshal updates to json: %e\r\n", err)
+					logger.Printf("failed to marshal updates to json: %v\r\n", err)
 				} else {
 					updates <- handlers.Update{Event: "remove", Data: string(updateJson)}
 				}
@@ -97,7 +97,7 @@ func AuditGames(ctx context.Context, gamesStore *data.GameCache, updates chan ha
 				// marshal to json and return
 				updateJson, err := fail.ToJSON()
 				if err != nil {
-					logger.Printf("failed to marshal updates to json: %e\r\n", err)
+					logger.Printf("failed to marshal updates to json: %v\r\n", err)
 				} else {
 					updates <- handlers.Update{Event: "fail", Data: string(updateJson)}
 				}
