@@ -2,6 +2,7 @@
 FROM golang:1.22.4-alpine AS builder
 # Install git if you need it for fetching dependencies
 # RUN apk add --no-cache git
+RUN apk add --no-cache tzdata
 
 WORKDIR /app
 
