@@ -30,7 +30,7 @@ func FindNewGames(ctx context.Context, gamesStore *data.GameCache, updates chan 
 			logger.Println("FindNewGames: finding new games")
 			var added []uint32
 			// fetch a list of all games on today's date and their links
-			gameIds, gameLinks, err := data.ListGamesByDate(ctx, "02/20/2025")
+			gameIds, gameLinks, err := data.ListGamesByDate(ctx, "")
 			if err != nil {
 				logger.Println("Added 0 games")
 				logger.Printf("error %e", err)
