@@ -2,7 +2,6 @@
 FROM golang:1.22.4-alpine AS builder
 # Install git if you need it for fetching dependencies
 # RUN apk add --no-cache git
-RUN apk add --no-cache tzdata
 
 WORKDIR /app
 
@@ -22,6 +21,9 @@ FROM alpine:latest
 
 # Add certificates (optional, but useful if your app makes HTTPS calls)
 # RUN apk --no-cache add ca-certificates
+
+# Add timezone defs because alpine doesn't
+RUN apk add --no-cache tzdata
 
 WORKDIR /root/
 
