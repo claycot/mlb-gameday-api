@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/claycot/mlb-gameday-api/data"
 )
@@ -67,6 +68,10 @@ func (g *Games) GetUpdates(rw http.ResponseWriter, r *http.Request, broadcaster 
 		return
 	}
 
+	// keep alive timer
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
 	// send updates to the channel
 	g.l.Println("Starting event stream")
 	for {
@@ -74,6 +79,9 @@ func (g *Games) GetUpdates(rw http.ResponseWriter, r *http.Request, broadcaster 
 		case update := <-userChannel:
 			g.l.Printf("Sending update: %s", update)
 			fmt.Fprintf(rw, "event: %s\ndata: %s\n\n", update.Event, update.Data)
+			flusher.Flush()
+		case <-ticker.C:
+			fmt.Fprintf(rw, "event: %s\ndata: %s\n\n", "keep-alive", " ")
 			flusher.Flush()
 		case <-r.Context().Done():
 			g.l.Printf("Connection closed! Reason: %v", r.Context().Err())
