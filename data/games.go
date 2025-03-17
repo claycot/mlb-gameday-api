@@ -68,13 +68,11 @@ type Status struct {
 }
 
 type Time struct {
-	Display      string `json:"display"`
 	DateTime     string `json:"dateTime"`
-	OriginalDate string `json:"originalDate"`
-	OfficialDate string `json:"officialDate"`
-	DayNight     string `json:"dayNight"`
-	ShortTime    string `json:"time"`
-	AmPm         string `json:"ampm"`
+	// OriginalDate string `json:"originalDate"`
+	// OfficialDate string `json:"officialDate"`
+	// DayNight     string `json:"dayNight"`
+	// ShortTime    string `json:"time"`
 }
 
 type Teams struct {
