@@ -119,8 +119,6 @@ type Datetime struct {
 	OriginalDate string    `json:"originalDate"`
 	OfficialDate string    `json:"officialDate"`
 	DayNight     string    `json:"dayNight"`
-	Time         string    `json:"time"`
-	Ampm         string    `json:"ampm"`
 }
 type Status2 struct {
 	AbstractGameState string `json:"abstractGameState"`
