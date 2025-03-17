@@ -19,6 +19,10 @@ func FindNewGames(ctx context.Context, gamesStore *data.GameCache, updates chan 
 	ticker := time.NewTicker(15 * time.Minute)
 	defer ticker.Stop()
 
+	// run immediately on creation
+	logger.Println("FindNewGames: running initial fetch")
+	updateGames(ctx, gamesStore, updates, logger)
+
 	for {
 		select {
 		// if context is canceled, shut down the worker
@@ -28,67 +32,71 @@ func FindNewGames(ctx context.Context, gamesStore *data.GameCache, updates chan 
 		// on each tick, fetch new games, add them to game store, and retrieve their info
 		case <-ticker.C:
 			logger.Println("FindNewGames: finding new games")
-			var added []uint32
-			// fetch a list of all games on today's date and their links
-			gameIds, gameLinks, err := data.ListGamesByDate(ctx, "")
-			if err != nil {
-				logger.Printf("Added 0 games due to error: %v\r\n", err)
-				continue
-			}
-
-			// add new games to the cache
-			for i, id := range gameIds {
-				// if !discovered, game already existed or cache is full (full cache throws err)
-				discovered, err := gamesStore.Discover(id, gameLinks[i])
-
-				// cache may be full
-				// TODO: handle this error more smarter
-				if err != nil {
-					continue
-				}
-
-				// if the game is new, queue it for fetching
-				if discovered {
-					added = append(added, id)
-				}
-			}
-
-			// if games were added, update their information and notify channel
-			if len(added) > 0 {
-				logger.Printf("Added games: %v", added)
-				add := &data.Games{
-					Metadata: data.Metadata{
-						Timestamp: time.Now(),
-					},
-					Data: make([]*data.Game, len(added)),
-				}
-
-				// fetch information on new games
-				var wgGameInfo sync.WaitGroup
-				for i, id := range added {
-					wgGameInfo.Add(1)
-					go func(writeIndex int, gameId uint32) {
-						defer wgGameInfo.Done()
-						game, valid := gamesStore.GetOne(ctx, gameId)
-						if valid {
-							add.Data[writeIndex] = &game
-						} else {
-							logger.Printf("failed to get information on game %d", gameId)
-						}
-					}(i, id)
-				}
-				wgGameInfo.Wait()
-
-				// marshal into json and send
-				addJson, err := add.ToJSON()
-				if err == nil {
-					updates <- handlers.Update{Event: "add", Data: string(addJson)}
-				} else {
-					fmt.Println(err)
-				}
-			} else {
-				logger.Println("Added 0 games")
-			}
+			updateGames(ctx, gamesStore, updates, logger)
 		}
+	}
+}
+
+func updateGames(ctx context.Context, gamesStore *data.GameCache, updates chan handlers.Update, logger *log.Logger) {
+	var added []uint32
+	// fetch a list of all games on today's date and their links
+	gameIds, gameLinks, err := data.ListGamesByDate(ctx, "")
+	if err != nil {
+		logger.Printf("Added 0 games due to error: %v\r\n", err)
+		return
+	}
+
+	// add new games to the cache
+	for i, id := range gameIds {
+		// if !discovered, game already existed or cache is full (full cache throws err)
+		discovered, err := gamesStore.Discover(id, gameLinks[i])
+
+		// cache may be full
+		// TODO: handle this error more smarter
+		if err != nil {
+			return
+		}
+
+		// if the game is new, queue it for fetching
+		if discovered {
+			added = append(added, id)
+		}
+	}
+
+	// if games were added, update their information and notify channel
+	if len(added) > 0 {
+		logger.Printf("Added games: %v", added)
+		add := &data.Games{
+			Metadata: data.Metadata{
+				Timestamp: time.Now(),
+			},
+			Data: make([]*data.Game, len(added)),
+		}
+
+		// fetch information on new games
+		var wgGameInfo sync.WaitGroup
+		for i, id := range added {
+			wgGameInfo.Add(1)
+			go func(writeIndex int, gameId uint32) {
+				defer wgGameInfo.Done()
+				game, valid := gamesStore.GetOne(ctx, gameId)
+				if valid {
+					add.Data[writeIndex] = &game
+				} else {
+					logger.Printf("failed to get information on game %d", gameId)
+				}
+			}(i, id)
+		}
+		wgGameInfo.Wait()
+
+		// marshal into json and send
+		addJson, err := add.ToJSON()
+		if err == nil {
+			updates <- handlers.Update{Event: "add", Data: string(addJson)}
+		} else {
+			fmt.Println(err)
+		}
+	} else {
+		logger.Println("Added 0 games")
 	}
 }

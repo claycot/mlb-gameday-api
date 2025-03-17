@@ -67,14 +67,6 @@ type Status struct {
 	StartTime api_data.Datetime `json:"start_time"`
 }
 
-type Time struct {
-	DateTime     string `json:"dateTime"`
-	// OriginalDate string `json:"originalDate"`
-	// OfficialDate string `json:"officialDate"`
-	// DayNight     string `json:"dayNight"`
-	// ShortTime    string `json:"time"`
-}
-
 type Teams struct {
 	Away Team `json:"away"`
 	Home Team `json:"home"`
