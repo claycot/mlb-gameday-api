@@ -116,9 +116,9 @@ type LiveGame struct {
 }
 type Datetime struct {
 	DateTime     time.Time `json:"dateTime"`
-	OriginalDate string    `json:"originalDate"`
-	OfficialDate string    `json:"officialDate"`
-	DayNight     string    `json:"dayNight"`
+	// OriginalDate string    `json:"originalDate"`
+	// OfficialDate string    `json:"officialDate"`
+	// DayNight     string    `json:"dayNight"`
 }
 type Status2 struct {
 	AbstractGameState string `json:"abstractGameState"`
