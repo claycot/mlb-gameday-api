@@ -24,44 +24,51 @@ type Schedule struct {
 	// TotalGamesInProgress int    `json:"totalGamesInProgress"`
 	Dates []Date `json:"dates"`
 }
-type Status struct {
-	AbstractGameState string `json:"abstractGameState"`
-	CodedGameState    string `json:"codedGameState"`
-	DetailedState     string `json:"detailedState"`
-	StatusCode        string `json:"statusCode"`
-	StartTimeTBD      bool   `json:"startTimeTBD"`
-	AbstractGameCode  string `json:"abstractGameCode"`
-}
-type LeagueRecord struct {
-	Wins   int    `json:"wins"`
-	Losses int    `json:"losses"`
-	Pct    string `json:"pct"`
-}
-type TeamName struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
-	Link string `json:"link"`
-}
-type Team struct {
-	LeagueRecord LeagueRecord `json:"leagueRecord"`
-	Score        int          `json:"score"`
-	Team         TeamName     `json:"team"`
-	IsWinner     bool         `json:"isWinner"`
-	SplitSquad   bool         `json:"splitSquad"`
-	SeriesNumber int          `json:"seriesNumber"`
-}
-type Teams struct {
-	Away Team `json:"away"`
-	Home Team `json:"home"`
-}
-type Venue struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
-	Link string `json:"link"`
-}
-type Content struct {
-	Link string `json:"link"`
-}
+
+//	type Status struct {
+//		AbstractGameState string `json:"abstractGameState"`
+//		CodedGameState    string `json:"codedGameState"`
+//		DetailedState     string `json:"detailedState"`
+//		StatusCode        string `json:"statusCode"`
+//		StartTimeTBD      bool   `json:"startTimeTBD"`
+//		AbstractGameCode  string `json:"abstractGameCode"`
+//	}
+//
+//	type LeagueRecord struct {
+//		Wins   int    `json:"wins"`
+//		Losses int    `json:"losses"`
+//		Pct    string `json:"pct"`
+//	}
+//
+//	type TeamName struct {
+//		ID   int    `json:"id"`
+//		Name string `json:"name"`
+//		Link string `json:"link"`
+//	}
+//
+//	type Team struct {
+//		LeagueRecord LeagueRecord `json:"leagueRecord"`
+//		Score        int          `json:"score"`
+//		Team         TeamName     `json:"team"`
+//		IsWinner     bool         `json:"isWinner"`
+//		SplitSquad   bool         `json:"splitSquad"`
+//		SeriesNumber int          `json:"seriesNumber"`
+//	}
+//
+//	type Teams struct {
+//		Away Team `json:"away"`
+//		Home Team `json:"home"`
+//	}
+//
+//	type Venue struct {
+//		ID   int    `json:"id"`
+//		Name string `json:"name"`
+//		Link string `json:"link"`
+//	}
+//
+//	type Content struct {
+//		Link string `json:"link"`
+//	}
 type Game struct {
 	GamePk uint32 `json:"gamePk"`
 	// GameGUID               string    `json:"gameGuid"`
@@ -157,7 +164,7 @@ type ProbablePitchers struct {
 }
 type GameData struct {
 	Datetime         Datetime               `json:"datetime"`
-	Status           Status                 `json:"status"`
+	Status           Status2                `json:"status"`
 	Teams            Teams2                 `json:"teams"`
 	Players          map[string]PlayerNamed `json:"players"`
 	ProbablePitchers ProbablePitchers       `json:"probablePitchers"`
