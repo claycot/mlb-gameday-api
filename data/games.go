@@ -8,6 +8,7 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -109,7 +110,7 @@ func (gc *GameCache) Discover(id uint32, link string) (bool, error) {
 	}
 
 	// TODO: Magic number uint8 max
-	if gc.length >= 255 {
+	if gc.length == 255 {
 		return false, fmt.Errorf("games cache is full with %d games", gc.length)
 	}
 
@@ -321,11 +322,15 @@ func ListGamesByDate(ctx context.Context, dateString string) ([]uint32, []string
 		return nil, nil, fmt.Errorf("schedule endpoint returned no games for provided date: %s", dateString)
 	}
 
+	// get fields for links
+	fields := generateFieldsString(api_data.LiveGame{})
+
 	gameIds := make([]uint32, len(schedule.Dates[0].Games))
 	gameLinks := make([]string, len(schedule.Dates[0].Games))
 	for gameNum := 0; gameNum < len(schedule.Dates[0].Games); gameNum++ {
 		gameIds[gameNum] = schedule.Dates[0].Games[gameNum].GamePk
-		gameLinks[gameNum] = os.Getenv("MLB_API_URL") + schedule.Dates[0].Games[gameNum].Link
+		// build the link with the desired fields
+		gameLinks[gameNum] = os.Getenv("MLB_API_URL") + schedule.Dates[0].Games[gameNum].Link + "?fields=" + fields
 	}
 	return gameIds, gameLinks, nil
 }
@@ -506,4 +511,73 @@ func sortGames(games []*Game) {
 
 		return g1Start.Before(g2Start)
 	})
+}
+
+// recursive function to extract field names using JSON tags
+func extractFieldsFromStruct(t reflect.Type, prefix string) []string {
+	var fields []string
+
+	// if not a struct, return
+	if t.Kind() != reflect.Struct {
+		return fields
+	}
+
+	// iterate over the fields of a struct
+	for i := range t.NumField() {
+		field := t.Field(i)
+
+		// skip private fields
+		if field.PkgPath != "" {
+			continue
+		}
+
+		// get JSON field tag
+		jsonTag := field.Tag.Get("json")
+
+		// skip fields without json tags
+		if jsonTag == "" || jsonTag == "-" {
+			continue
+		}
+
+		// handle cases where the tag might have options (e.g., "name,omitempty")
+		jsonName := strings.Split(jsonTag, ",")[0]
+
+		// construct the full path for nested fields
+		fullPath := jsonName
+		if prefix != "" {
+			fullPath = prefix + "," + jsonName
+		}
+
+		// handle different field types
+		if field.Type.Kind() == reflect.Struct {
+			// recursively extract fields from a nested struct
+			fields = append(fields, extractFieldsFromStruct(field.Type, fullPath)...)
+		} else if field.Type.Kind() == reflect.Map {
+			// process maps by getting the value element
+			fields = append(fields, extractFieldsFromStruct(field.Type.Elem(), fullPath)...)
+
+		} else {
+			// otherwise, just add the field name
+			fields = append(fields, fullPath)
+		}
+	}
+
+	return fields
+}
+
+// generate a csv string representing a struct's fields (including nesting)
+func generateFieldsString(obj any) string {
+	// get the type
+	t := reflect.TypeOf(obj)
+
+	// if the type is a pointer, get the underlying type
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	// get nested fields from the type
+	fields := extractFieldsFromStruct(t, "")
+
+	// join and return fields
+	return strings.Join(fields, ",")
 }
