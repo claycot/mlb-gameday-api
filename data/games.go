@@ -293,7 +293,7 @@ func ListGamesByDate(ctx context.Context, dateString string) ([]uint32, []string
 		dateString = time.Now().In(pacificTime).Format("01/02/2006")
 	}
 
-	apiUrl := fmt.Sprintf("%s/api/v1/schedule/?sportId=1&date=%s", os.Getenv("MLB_API_URL"), dateString)
+	apiUrl := fmt.Sprintf("%s/api/v1/schedule/?sportId=1&date=%s&fields=dates,games,gamePk,link", os.Getenv("MLB_API_URL"), dateString)
 	fmt.Println(apiUrl)
 
 	// limit each fetch to 10 seconds
