@@ -560,7 +560,10 @@ func extractFieldsFromStruct(t reflect.Type, prefix string) []string {
 		}
 
 		// handle different field types
-		if field.Type.Kind() == reflect.Struct || field.Type.Kind() == reflect.Ptr || field.Type.Kind() == reflect.Map || field.Type.Kind() == reflect.Slice || field.Type.Kind() == reflect.Array {
+		if field.Type == reflect.TypeOf(time.Time{}) {
+			// edge case to handle time as a basic value
+			fields = append(fields, fullPath)
+		} else if field.Type.Kind() == reflect.Struct || field.Type.Kind() == reflect.Ptr || field.Type.Kind() == reflect.Map || field.Type.Kind() == reflect.Slice || field.Type.Kind() == reflect.Array {
 			// recursively extract fields from a nested struct
 			fields = append(fields, extractFieldsFromStruct(field.Type, fullPath)...)
 		} else {
