@@ -294,7 +294,10 @@ func ListGamesByDate(ctx context.Context, dateString string) ([]uint32, []string
 		dateString = time.Now().In(pacificTime).Format("01/02/2006")
 	}
 
-	apiUrl := fmt.Sprintf("%s/api/v1/schedule/?sportId=1&date=%s&fields=dates,games,gamePk,link", os.Getenv("MLB_API_URL"), dateString)
+	// get fields from struct
+	fieldsSchedule := generateFieldsString(api_data.Schedule{})
+
+	apiUrl := fmt.Sprintf("%s/api/v1/schedule/?sportId=1&date=%s&fields=%s", os.Getenv("MLB_API_URL"), dateString, fieldsSchedule)
 	fmt.Println(apiUrl)
 
 	// limit each fetch to 10 seconds
@@ -323,14 +326,14 @@ func ListGamesByDate(ctx context.Context, dateString string) ([]uint32, []string
 	}
 
 	// get fields for links
-	fields := generateFieldsString(api_data.LiveGame{})
+	fieldsLivegame := generateFieldsString(api_data.LiveGame{})
 
 	gameIds := make([]uint32, len(schedule.Dates[0].Games))
 	gameLinks := make([]string, len(schedule.Dates[0].Games))
-	for gameNum := 0; gameNum < len(schedule.Dates[0].Games); gameNum++ {
+	for gameNum := range schedule.Dates[0].Games {
 		gameIds[gameNum] = schedule.Dates[0].Games[gameNum].GamePk
 		// build the link with the desired fields
-		gameLinks[gameNum] = os.Getenv("MLB_API_URL") + schedule.Dates[0].Games[gameNum].Link + "?fields=" + fields
+		gameLinks[gameNum] = fmt.Sprintf("%s%s?fields=%s", os.Getenv("MLB_API_URL"), schedule.Dates[0].Games[gameNum].Link, fieldsLivegame)
 	}
 	return gameIds, gameLinks, nil
 }
@@ -517,6 +520,11 @@ func sortGames(games []*Game) {
 func extractFieldsFromStruct(t reflect.Type, prefix string) []string {
 	var fields []string
 
+	// get the underlying type from a pointer, map, slice, or array
+	if t.Kind() == reflect.Ptr || t.Kind() == reflect.Map || t.Kind() == reflect.Slice || t.Kind() == reflect.Array {
+		t = t.Elem()
+	}
+
 	// if not a struct, return
 	if t.Kind() != reflect.Struct {
 		return fields
@@ -549,13 +557,9 @@ func extractFieldsFromStruct(t reflect.Type, prefix string) []string {
 		}
 
 		// handle different field types
-		if field.Type.Kind() == reflect.Struct {
+		if field.Type.Kind() == reflect.Struct || field.Type.Kind() == reflect.Ptr || field.Type.Kind() == reflect.Map || field.Type.Kind() == reflect.Slice || field.Type.Kind() == reflect.Array {
 			// recursively extract fields from a nested struct
 			fields = append(fields, extractFieldsFromStruct(field.Type, fullPath)...)
-		} else if field.Type.Kind() == reflect.Map {
-			// process maps by getting the value element
-			fields = append(fields, extractFieldsFromStruct(field.Type.Elem(), fullPath)...)
-
 		} else {
 			// otherwise, just add the field name
 			fields = append(fields, fullPath)
@@ -569,11 +573,6 @@ func extractFieldsFromStruct(t reflect.Type, prefix string) []string {
 func generateFieldsString(obj any) string {
 	// get the type
 	t := reflect.TypeOf(obj)
-
-	// if the type is a pointer, get the underlying type
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
 
 	// get nested fields from the type
 	fields := extractFieldsFromStruct(t, "")
