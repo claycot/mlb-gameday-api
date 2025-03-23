@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -109,7 +111,7 @@ func (gc *GameCache) Discover(id uint32, link string) (bool, error) {
 	}
 
 	// TODO: Magic number uint8 max
-	if gc.length >= 255 {
+	if gc.length == 255 {
 		return false, fmt.Errorf("games cache is full with %d games", gc.length)
 	}
 
@@ -282,7 +284,7 @@ func GetInitialGames(gamesStore *GameCache) (*Games, error) {
 }
 
 // get formatted information on live games with a given date string MM/DD/YYYY (or "" to get today)
-func ListGamesByDate(ctx context.Context, dateString string) ([]uint32, []string, error) {
+func ListGamesByDate(ctx context.Context, l *log.Logger, dateString string) ([]uint32, []string, error) {
 	// set the date for the game fetch
 	if dateString == "" {
 		// force LA time since server might change day early
@@ -293,8 +295,13 @@ func ListGamesByDate(ctx context.Context, dateString string) ([]uint32, []string
 		dateString = time.Now().In(pacificTime).Format("01/02/2006")
 	}
 
-	apiUrl := fmt.Sprintf("%s/api/v1/schedule/?sportId=1&date=%s", os.Getenv("MLB_API_URL"), dateString)
-	fmt.Println(apiUrl)
+	// get fields from struct
+	fieldsSchedule := generateFieldsString(api_data.Schedule{})
+
+	apiUrl := fmt.Sprintf("%s/api/v1/schedule/?sportId=1&date=%s&fields=%s", os.Getenv("MLB_API_URL"), dateString, fieldsSchedule)
+
+	// log request
+	l.Printf("Request: %s", apiUrl)
 
 	// limit each fetch to 10 seconds
 	fetchCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -321,11 +328,15 @@ func ListGamesByDate(ctx context.Context, dateString string) ([]uint32, []string
 		return nil, nil, fmt.Errorf("schedule endpoint returned no games for provided date: %s", dateString)
 	}
 
+	// get fields for links
+	fieldsLivegame := generateFieldsString(api_data.LiveGame{})
+
 	gameIds := make([]uint32, len(schedule.Dates[0].Games))
 	gameLinks := make([]string, len(schedule.Dates[0].Games))
-	for gameNum := 0; gameNum < len(schedule.Dates[0].Games); gameNum++ {
+	for gameNum := range schedule.Dates[0].Games {
 		gameIds[gameNum] = schedule.Dates[0].Games[gameNum].GamePk
-		gameLinks[gameNum] = os.Getenv("MLB_API_URL") + schedule.Dates[0].Games[gameNum].Link
+		// build the link with the desired fields
+		gameLinks[gameNum] = fmt.Sprintf("%s%s?fields=%s", os.Getenv("MLB_API_URL"), schedule.Dates[0].Games[gameNum].Link, fieldsLivegame)
 	}
 	return gameIds, gameLinks, nil
 }
@@ -506,4 +517,69 @@ func sortGames(games []*Game) {
 
 		return g1Start.Before(g2Start)
 	})
+}
+
+// recursive function to extract field names using JSON tags
+func extractFieldsFromStruct(t reflect.Type, prefix string) []string {
+	var fields []string
+
+	// get the underlying type from a pointer, map, slice, or array
+	if t.Kind() == reflect.Ptr || t.Kind() == reflect.Map || t.Kind() == reflect.Slice || t.Kind() == reflect.Array {
+		t = t.Elem()
+	}
+
+	// if not a struct, return
+	if t.Kind() != reflect.Struct {
+		return fields
+	}
+
+	// iterate over the fields of a struct
+	for i := range t.NumField() {
+		field := t.Field(i)
+
+		// skip private fields
+		if field.PkgPath != "" {
+			continue
+		}
+
+		// get JSON field tag
+		jsonTag := field.Tag.Get("json")
+
+		// skip fields without json tags
+		if jsonTag == "" || jsonTag == "-" {
+			continue
+		}
+
+		// handle cases where the tag might have options (e.g., "name,omitempty")
+		jsonName := strings.Split(jsonTag, ",")[0]
+
+		// construct the full path for nested fields
+		fullPath := jsonName
+		if prefix != "" {
+			fullPath = prefix + "," + jsonName
+		}
+
+		// handle different field types
+		if field.Type.Kind() == reflect.Struct || field.Type.Kind() == reflect.Ptr || field.Type.Kind() == reflect.Map || field.Type.Kind() == reflect.Slice || field.Type.Kind() == reflect.Array {
+			// recursively extract fields from a nested struct
+			fields = append(fields, extractFieldsFromStruct(field.Type, fullPath)...)
+		} else {
+			// otherwise, just add the field name
+			fields = append(fields, fullPath)
+		}
+	}
+
+	return fields
+}
+
+// generate a csv string representing a struct's fields (including nesting)
+func generateFieldsString(obj any) string {
+	// get the type
+	t := reflect.TypeOf(obj)
+
+	// get nested fields from the type
+	fields := extractFieldsFromStruct(t, "")
+
+	// join and return fields
+	return strings.Join(fields, ",")
 }

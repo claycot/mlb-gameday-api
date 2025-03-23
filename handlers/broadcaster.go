@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"sync/atomic"
 
@@ -18,7 +19,7 @@ func NewBroadcaster() *Broadcaster {
 }
 
 // register a client's channel to the broadcaster and return their uuid
-func (b *Broadcaster) Register(channel chan *Update) (uuid.UUID, error) {
+func (b *Broadcaster) Register(channel chan *Update, l *log.Logger) (uuid.UUID, error) {
 	var id uuid.UUID
 	var err error
 	exists := true
@@ -37,13 +38,13 @@ func (b *Broadcaster) Register(channel chan *Update) (uuid.UUID, error) {
 	b.clients.Store(id, channel)
 	atomic.AddInt32(&b.Count, 1)
 
-	fmt.Printf("registered client with ID %v. now serving %d clients.\r\n", id, b.Count)
+	l.Printf("registered client with ID %v. now serving %d clients.\r\n", id, b.Count)
 
 	return id, nil
 }
 
 // deregister a client's channel from the broadcaster and delete all references
-func (b *Broadcaster) Deregister(clientId uuid.UUID) (bool, error) {
+func (b *Broadcaster) Deregister(clientId uuid.UUID, l *log.Logger) (bool, error) {
 	// attempt to load the client's channel from the broadcaster
 	channelRaw, exists := b.clients.Load(clientId)
 
@@ -60,18 +61,18 @@ func (b *Broadcaster) Deregister(clientId uuid.UUID) (bool, error) {
 	b.clients.Delete(clientId)
 	atomic.AddInt32(&b.Count, -1)
 
-	fmt.Printf("deregistered client with ID %v. now serving %d clients.\r\n", clientId, b.Count)
+	l.Printf("deregistered client with ID %v. now serving %d clients.\r\n", clientId, b.Count)
 
 	return true, nil
 }
 
 // broadcast an update to all clients
-func (b *Broadcaster) Broadcast(message *Update) (int, error) {
+func (b *Broadcaster) Broadcast(message *Update, l *log.Logger) (int, error) {
 	i := 0
 	b.clients.Range(func(key, value interface{}) bool {
 		channel, ok := value.(chan *Update)
 		if !ok {
-			fmt.Printf("Warning: client %s has an invalid channel type", key)
+			l.Printf("Warning: client %s has an invalid channel type", key)
 			return true
 		}
 
@@ -79,7 +80,7 @@ func (b *Broadcaster) Broadcast(message *Update) (int, error) {
 		case channel <- message:
 			i++
 		default:
-			fmt.Printf("Warning: dropping message for client %s: channel is full", key)
+			l.Printf("Warning: dropping message for client %s: channel is full", key)
 		}
 
 		return true

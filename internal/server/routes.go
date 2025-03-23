@@ -30,7 +30,7 @@ func Initialize(ctx context.Context, wg *sync.WaitGroup, logger *log.Logger) *ht
 			}
 
 			// broadcast the message to all active clients
-			countSent, err := broadcaster.Broadcast(&msg)
+			countSent, err := broadcaster.Broadcast(&msg, logger)
 			if err != nil {
 				logger.Printf("failed to send update: %v\r\n", err)
 			}

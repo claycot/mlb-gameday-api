@@ -2,7 +2,6 @@ package workers
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -40,7 +39,7 @@ func FindNewGames(ctx context.Context, gamesStore *data.GameCache, updates chan 
 func updateGames(ctx context.Context, gamesStore *data.GameCache, updates chan handlers.Update, logger *log.Logger) {
 	var added []uint32
 	// fetch a list of all games on today's date and their links
-	gameIds, gameLinks, err := data.ListGamesByDate(ctx, "")
+	gameIds, gameLinks, err := data.ListGamesByDate(ctx, logger, "")
 	if err != nil {
 		logger.Printf("Added 0 games due to error: %v\r\n", err)
 		return
@@ -94,7 +93,7 @@ func updateGames(ctx context.Context, gamesStore *data.GameCache, updates chan h
 		if err == nil {
 			updates <- handlers.Update{Event: "add", Data: string(addJson)}
 		} else {
-			fmt.Println(err)
+			logger.Println(err)
 		}
 	} else {
 		logger.Println("Added 0 games")

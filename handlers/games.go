@@ -53,13 +53,13 @@ func (g *Games) GetUpdates(rw http.ResponseWriter, r *http.Request, broadcaster 
 
 	// make a channel to send SSE updates to the user
 	userChannel := make(chan *Update, 16)
-	chanId, err := broadcaster.Register(userChannel)
+	chanId, err := broadcaster.Register(userChannel, g.l)
 
 	if err != nil {
 		http.Error(rw, fmt.Sprintf("Unable to create channel: %s", err), http.StatusInternalServerError)
 		return
 	}
-	defer broadcaster.Deregister(chanId)
+	defer broadcaster.Deregister(chanId, g.l)
 
 	// flush messages to the updates channel
 	flusher, ok := rw.(http.Flusher)
