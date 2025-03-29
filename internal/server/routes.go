@@ -32,20 +32,22 @@ func Initialize(ctx context.Context, wg *sync.WaitGroup, logger *log.Logger) *ht
 			// broadcast the message to all active clients
 			countSent, err := broadcaster.Broadcast(&msg, logger)
 			if err != nil {
-				logger.Printf("failed to send update: %v\r\n", err)
+				logger.Printf("[ERROR] Failed to send update: %v\r\n", err)
 			}
 
-			logger.Printf("sent update to %d of %d connected clients", countSent, broadcaster.Count)
+			if broadcaster.Count != 0 {
+				logger.Printf("[INFO] Sent update to %d of %d connected clients", countSent, broadcaster.Count)
+			}
 		}
 	}()
 
 	// on context cancelation, wait for workers to finish and then close the channel
 	go func() {
 		<-ctx.Done()
-		logger.Println("Context canceled, waiting for workers to finish...")
+		logger.Println("[INFO] Context canceled, waiting for workers to finish...")
 
 		wg.Wait()
-		logger.Println("All workers done, closing updates channel")
+		logger.Println("[INFO] All workers done, closing updates channel")
 		close(updates)
 	}()
 

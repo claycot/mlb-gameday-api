@@ -10,7 +10,7 @@ import (
 )
 
 type Games struct {
-	l *log.Logger
+	logger *log.Logger
 }
 
 type Update struct {
@@ -24,7 +24,7 @@ func NewGames(l *log.Logger) *Games {
 
 // handler for when a user first visits and the existing games should be ready on page load
 func (g *Games) GetInitial(rw http.ResponseWriter, r *http.Request, store *data.GameCache) {
-	g.l.Println("Handle GET initial")
+	g.logger.Println("[INFO] GET initial called")
 
 	gameList, err := data.GetInitialGames(store)
 	if err != nil {
@@ -45,7 +45,7 @@ func (g *Games) GetInitial(rw http.ResponseWriter, r *http.Request, store *data.
 
 // handler for SSE updates to the games on the site
 func (g *Games) GetUpdates(rw http.ResponseWriter, r *http.Request, broadcaster *Broadcaster) {
-	g.l.Println("Handle GET updates")
+	g.logger.Println("[INFO] GET updates called")
 
 	rw.Header().Set("Content-Type", "text/event-stream")
 	rw.Header().Set("Cache-Control", "no-cache")
@@ -53,13 +53,13 @@ func (g *Games) GetUpdates(rw http.ResponseWriter, r *http.Request, broadcaster 
 
 	// make a channel to send SSE updates to the user
 	userChannel := make(chan *Update, 16)
-	chanId, err := broadcaster.Register(userChannel, g.l)
+	chanId, err := broadcaster.Register(userChannel, g.logger)
 
 	if err != nil {
 		http.Error(rw, fmt.Sprintf("Unable to create channel: %s", err), http.StatusInternalServerError)
 		return
 	}
-	defer broadcaster.Deregister(chanId, g.l)
+	defer broadcaster.Deregister(chanId, g.logger)
 
 	// flush messages to the updates channel
 	flusher, ok := rw.(http.Flusher)
@@ -73,18 +73,18 @@ func (g *Games) GetUpdates(rw http.ResponseWriter, r *http.Request, broadcaster 
 	defer ticker.Stop()
 
 	// send updates to the channel
-	g.l.Println("Starting event stream")
+	// g.logger.Println("[INFO] Starting event stream")
 	for {
 		select {
 		case update := <-userChannel:
-			g.l.Printf("Sending update: %s", update)
+			// g.logger.Printf("[INFO] Sending update: %s", update)
 			fmt.Fprintf(rw, "event: %s\ndata: %s\n\n", update.Event, update.Data)
 			flusher.Flush()
 		case <-ticker.C:
 			fmt.Fprintf(rw, "event: %s\ndata: %s\n\n", "keep-alive", " ")
 			flusher.Flush()
 		case <-r.Context().Done():
-			g.l.Printf("Connection closed! Reason: %v", r.Context().Err())
+			g.logger.Printf("[INFO] Connection %v closed! Reason: %v", chanId, r.Context().Err())
 			return
 		}
 	}
