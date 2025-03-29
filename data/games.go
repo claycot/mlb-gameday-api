@@ -284,7 +284,7 @@ func GetInitialGames(gamesStore *GameCache) (*Games, error) {
 }
 
 // get formatted information on live games with a given date string MM/DD/YYYY (or "" to get today)
-func ListGamesByDate(ctx context.Context, l *log.Logger, dateString string) ([]uint32, []string, error) {
+func ListGamesByDate(ctx context.Context, logger *log.Logger, dateString string) ([]uint32, []string, error) {
 	// set the date for the game fetch
 	if dateString == "" {
 		// force LA time since server might change day early
@@ -301,7 +301,7 @@ func ListGamesByDate(ctx context.Context, l *log.Logger, dateString string) ([]u
 	apiUrl := fmt.Sprintf("%s/api/v1/schedule/?sportId=1&date=%s&fields=%s", os.Getenv("MLB_API_URL"), dateString, fieldsSchedule)
 
 	// log request
-	l.Printf("Request: %s", apiUrl)
+	logger.Printf("[INFO] Making request: %s", apiUrl)
 
 	// limit each fetch to 10 seconds
 	fetchCtx, cancel := context.WithTimeout(ctx, 10*time.Second)

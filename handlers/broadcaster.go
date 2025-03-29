@@ -19,7 +19,7 @@ func NewBroadcaster() *Broadcaster {
 }
 
 // register a client's channel to the broadcaster and return their uuid
-func (b *Broadcaster) Register(channel chan *Update, l *log.Logger) (uuid.UUID, error) {
+func (b *Broadcaster) Register(channel chan *Update, logger *log.Logger) (uuid.UUID, error) {
 	var id uuid.UUID
 	var err error
 	exists := true
@@ -38,13 +38,13 @@ func (b *Broadcaster) Register(channel chan *Update, l *log.Logger) (uuid.UUID, 
 	b.clients.Store(id, channel)
 	atomic.AddInt32(&b.Count, 1)
 
-	l.Printf("registered client with ID %v. now serving %d clients.\r\n", id, b.Count)
+	logger.Printf("[INFO] Registered client with ID %v. Now serving %d clients\r\n", id, b.Count)
 
 	return id, nil
 }
 
 // deregister a client's channel from the broadcaster and delete all references
-func (b *Broadcaster) Deregister(clientId uuid.UUID, l *log.Logger) (bool, error) {
+func (b *Broadcaster) Deregister(clientId uuid.UUID, logger *log.Logger) (bool, error) {
 	// attempt to load the client's channel from the broadcaster
 	channelRaw, exists := b.clients.Load(clientId)
 
@@ -61,18 +61,18 @@ func (b *Broadcaster) Deregister(clientId uuid.UUID, l *log.Logger) (bool, error
 	b.clients.Delete(clientId)
 	atomic.AddInt32(&b.Count, -1)
 
-	l.Printf("deregistered client with ID %v. now serving %d clients.\r\n", clientId, b.Count)
+	logger.Printf("[INFO] Deregistered client with ID %v. Now serving %d clients\r\n", clientId, b.Count)
 
 	return true, nil
 }
 
 // broadcast an update to all clients
-func (b *Broadcaster) Broadcast(message *Update, l *log.Logger) (int, error) {
+func (b *Broadcaster) Broadcast(message *Update, logger *log.Logger) (int, error) {
 	i := 0
 	b.clients.Range(func(key, value interface{}) bool {
 		channel, ok := value.(chan *Update)
 		if !ok {
-			l.Printf("Warning: client %s has an invalid channel type", key)
+			logger.Printf("[ERROR] Client %s has an invalid channel type", key)
 			return true
 		}
 
@@ -80,15 +80,15 @@ func (b *Broadcaster) Broadcast(message *Update, l *log.Logger) (int, error) {
 		case channel <- message:
 			i++
 		default:
-			l.Printf("Warning: dropping message for client %s: channel is full", key)
+			logger.Printf("[ERROR] Dropping message for client %s: channel is full", key)
 		}
 
 		return true
 	})
 
-	if i == 0 {
-		return 0, fmt.Errorf("no active clients to broadcast to")
-	}
+	// if i == 0 {
+	// 	return 0, fmt.Errorf("no active clients to broadcast to")
+	// }
 
 	return i, nil
 }

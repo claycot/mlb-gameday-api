@@ -37,7 +37,7 @@ func New(ctx context.Context, wg *sync.WaitGroup, cfg *config.Config, logger *lo
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	s.logger.Printf("Starting server on %s", s.addr)
+	s.logger.Printf("[INFO] Starting server on %s", s.addr)
 
 	server := &http.Server{
 		Addr:    s.addr,
@@ -46,12 +46,12 @@ func (s *Server) Run(ctx context.Context) error {
 
 	go func() {
 		<-ctx.Done()
-		s.logger.Println("Shutting down server...")
+		s.logger.Println("[INFO] Shutting down server...")
 		ctxShutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
 		if err := server.Shutdown(ctxShutdown); err != nil {
-			s.logger.Printf("Error during server shutdown: %v", err)
+			s.logger.Printf("[ERROR] Error during server shutdown: %v", err)
 		}
 	}()
 

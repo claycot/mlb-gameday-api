@@ -19,18 +19,18 @@ func FindNewGames(ctx context.Context, gamesStore *data.GameCache, updates chan 
 	defer ticker.Stop()
 
 	// run immediately on creation
-	logger.Println("FindNewGames: running initial fetch")
+	logger.Println("[INFO] FindNewGames: running initial fetch")
 	updateGames(ctx, gamesStore, updates, logger)
 
 	for {
 		select {
 		// if context is canceled, shut down the worker
 		case <-ctx.Done():
-			logger.Println("Shutting down FindNewGames worker")
+			logger.Println("[INFO] Shutting down FindNewGames worker")
 			return
 		// on each tick, fetch new games, add them to game store, and retrieve their info
 		case <-ticker.C:
-			logger.Println("FindNewGames: finding new games")
+			logger.Println("[INFO] FindNewGames: finding new games")
 			updateGames(ctx, gamesStore, updates, logger)
 		}
 	}
@@ -41,7 +41,7 @@ func updateGames(ctx context.Context, gamesStore *data.GameCache, updates chan h
 	// fetch a list of all games on today's date and their links
 	gameIds, gameLinks, err := data.ListGamesByDate(ctx, logger, "")
 	if err != nil {
-		logger.Printf("Added 0 games due to error: %v\r\n", err)
+		logger.Printf("[ERROR] Added 0 games: %v\r\n", err)
 		return
 	}
 
@@ -64,7 +64,7 @@ func updateGames(ctx context.Context, gamesStore *data.GameCache, updates chan h
 
 	// if games were added, update their information and notify channel
 	if len(added) > 0 {
-		logger.Printf("Added games: %v", added)
+		logger.Printf("[INFO] Added games: %v", added)
 		add := &data.Games{
 			Metadata: data.Metadata{
 				Timestamp: time.Now(),
@@ -82,7 +82,7 @@ func updateGames(ctx context.Context, gamesStore *data.GameCache, updates chan h
 				if valid {
 					add.Data[writeIndex] = &game
 				} else {
-					logger.Printf("failed to get information on game %d", gameId)
+					logger.Printf("[ERROR] Failed to get information on game %d", gameId)
 				}
 			}(i, id)
 		}
@@ -93,9 +93,9 @@ func updateGames(ctx context.Context, gamesStore *data.GameCache, updates chan h
 		if err == nil {
 			updates <- handlers.Update{Event: "add", Data: string(addJson)}
 		} else {
-			logger.Println(err)
+			logger.Printf("[ERROR] Failed to marshal add to json: %v\r\n", err)
 		}
 	} else {
-		logger.Println("Added 0 games")
+		logger.Println("[INFO] Added 0 games")
 	}
 }

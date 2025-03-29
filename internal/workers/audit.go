@@ -22,7 +22,7 @@ func AuditGames(ctx context.Context, gamesStore *data.GameCache, updates chan ha
 		select {
 		// if context is canceled, shut down the worker
 		case <-ctx.Done():
-			logger.Println("Shutting down AuditGames worker")
+			logger.Println("[INFO] Shutting down AuditGames worker")
 			return
 		// on each tick, audit the games store
 		case <-ticker.C:
@@ -30,7 +30,7 @@ func AuditGames(ctx context.Context, gamesStore *data.GameCache, updates chan ha
 
 			// process updated games by pulling the new information
 			if len(updated) > 0 {
-				logger.Printf("Updated games: %v", updated)
+				logger.Printf("[INFO] Updated games: %v", updated)
 				// create a wrapper for the games
 				update := &data.Games{
 					Metadata: data.Metadata{
@@ -57,14 +57,14 @@ func AuditGames(ctx context.Context, gamesStore *data.GameCache, updates chan ha
 				// marshal to json and return
 				updateJson, err := update.ToJSON()
 				if err != nil {
-					logger.Printf("failed to marshal updates to json: %v\r\n", err)
+					logger.Printf("[ERROR] Failed to marshal updates to json: %v\r\n", err)
 				} else {
 					updates <- handlers.Update{Event: "update", Data: string(updateJson)}
 				}
 			}
 			// process removed games by outputting their IDs
 			if len(removed) > 0 {
-				logger.Printf("REMOVE:%v", removed)
+				logger.Printf("[INFO] Removed games: %v", removed)
 				remove := &data.GameIDs{
 					Metadata: data.Metadata{
 						Timestamp: time.Now(),
@@ -77,14 +77,14 @@ func AuditGames(ctx context.Context, gamesStore *data.GameCache, updates chan ha
 				// marshal to json and return
 				updateJson, err := remove.ToJSON()
 				if err != nil {
-					logger.Printf("failed to marshal updates to json: %v\r\n", err)
+					logger.Printf("[ERROR] Failed to marshal updates to json: %v\r\n", err)
 				} else {
 					updates <- handlers.Update{Event: "remove", Data: string(updateJson)}
 				}
 			}
 			// process failed games by outputting their IDs
 			if len(failed) > 0 {
-				logger.Printf("FAILED:%v", failed)
+				logger.Printf("[ERROR] Failed to get info on games: %v", failed)
 				fail := &data.GameIDs{
 					Metadata: data.Metadata{
 						Timestamp: time.Now(),
@@ -97,7 +97,7 @@ func AuditGames(ctx context.Context, gamesStore *data.GameCache, updates chan ha
 				// marshal to json and return
 				updateJson, err := fail.ToJSON()
 				if err != nil {
-					logger.Printf("failed to marshal updates to json: %v\r\n", err)
+					logger.Printf("[ERROR] Failed to marshal updates to json: %v\r\n", err)
 				} else {
 					updates <- handlers.Update{Event: "fail", Data: string(updateJson)}
 				}
