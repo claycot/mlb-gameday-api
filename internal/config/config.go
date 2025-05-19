@@ -19,11 +19,12 @@ type Config struct {
 func Load(logger *log.Logger) (*Config, error) {
 	err := godotenv.Load()
 	if err != nil {
-		logger.Printf("[ERROR] Failed to load .env file: %v\r\n", err)
+		logger.Printf("[WARN] Failed to load .env file: %v\r\n", err)
 	}
 
 	port, err := strconv.Atoi(getEnv("PORT_", "8080"))
 	if err != nil {
+		logger.Printf("[ERROR] Failed to parse PORT_ var: %v\r\n", err)
 		return nil, err
 	}
 
