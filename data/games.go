@@ -256,8 +256,10 @@ func (gc *GameCache) Audit(ctx context.Context) ([]uint32, []uint32, []uint32) {
 			}
 			// prune games that are final and started over 15 hours ago
 			// also prune games that don't start for 24 hours (postponed)
+			// also prune games with invalid ID (0)
 		} else if (game.State.Status.General == "Final" && time.Since(game.State.Status.StartTime.DateTime) > (15*time.Hour)) ||
-			(game.State.Status.General == "Preview" && time.Until(game.Metadata.Timestamp) > (24*time.Hour)) {
+			(game.State.Status.General == "Preview" && time.Until(game.Metadata.Timestamp) > (24*time.Hour)) ||
+			(game.ID == 0) {
 			gc.Delete(id)
 			removed = append(removed, id)
 		}
@@ -369,6 +371,11 @@ func FetchGame(ctx context.Context, link string) (Game, error) {
 	err = lg.FromJSON(resp.Body)
 	if err != nil {
 		return Game{}, err
+	}
+
+	// check for invalid game
+	if lg.GamePk == 0 {
+		return Game{}, fmt.Errorf("game not found at link: %s", link)
 	}
 
 	// make a map of the players in the game, starting with a null value
