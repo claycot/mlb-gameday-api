@@ -258,7 +258,7 @@ func (gc *GameCache) Audit(ctx context.Context) ([]uint32, []uint32, []uint32) {
 			// also prune games that don't start for 24 hours (postponed)
 			// also prune games with invalid ID (0)
 		} else if (game.State.Status.General == "Final" && time.Since(game.State.Status.StartTime.DateTime) > (15*time.Hour)) ||
-			(game.State.Status.General == "Preview" && time.Until(game.Metadata.Timestamp) > (24*time.Hour)) ||
+			(game.State.Status.General == "Preview" && time.Until(game.State.Status.StartTime.DateTime) > (24*time.Hour)) ||
 			(game.ID == 0) {
 			gc.Delete(id)
 			removed = append(removed, id)
